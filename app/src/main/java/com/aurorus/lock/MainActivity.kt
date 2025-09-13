@@ -2,7 +2,6 @@ package com.aurorus.lock
 
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,29 +19,35 @@ import androidx.compose.ui.unit.sp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            // We've removed the custom theme wrapper to keep it simple for now.
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
-                LockScreenApp()
+
+        // --- CORE LOGIC MOVED HERE ---
+        val devicePolicyManager = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val componentName = ComponentName(this, DeviceAdmin::class.java)
+        val isAdminActive = devicePolicyManager.isAdminActive(componentName)
+
+        if (isAdminActive) {
+            // If we have permission, lock the screen and immediately close the app.
+            devicePolicyManager.lockNow()
+            finish() // This is the key to closing the activity.
+        } else {
+            // If we don't have permission, show the UI to request it.
+            setContent {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // The UI is now only for requesting permission.
+                    PermissionRequestScreen()
+                }
             }
         }
     }
 }
 
 @Composable
-fun LockScreenApp() {
+fun PermissionRequestScreen() {
     val context = LocalContext.current
-    val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-    // The componentName now correctly uses your package structure.
     val componentName = ComponentName(context, DeviceAdmin::class.java)
-
-    // A state to track if the app is a device admin.
-    var isAdminActive by remember {
-        mutableStateOf(devicePolicyManager.isAdminActive(componentName))
-    }
 
     Column(
         modifier = Modifier
@@ -52,19 +57,15 @@ fun LockScreenApp() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = if (isAdminActive) "Ready to Lock" else "Permission Needed",
+            text = "Permission Needed",
             fontSize = 24.sp,
-            color = if (isAdminActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            color = MaterialTheme.colorScheme.error
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = if (isAdminActive) {
-                "Device admin permission is active. You can now lock the screen."
-            } else {
-                "This app requires Device Administrator permission to lock the screen. Please activate it."
-            },
+            text = "For one-tap locking, this app requires Device Administrator permission. Please activate it once.",
             textAlign = TextAlign.Center
         )
 
@@ -72,26 +73,20 @@ fun LockScreenApp() {
 
         Button(
             onClick = {
-                if (isAdminActive) {
-                    devicePolicyManager.lockNow()
-                } else {
-                    val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, componentName)
-                        putExtra(
-                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                            "This app needs permission to lock the screen."
-                        )
-                    }
-                    context.startActivity(intent)
-                    // NOTE: The UI state might not update automatically after returning
-                    // from the settings. A restart of the app will show the correct state.
-                    // A more advanced solution would use ActivityResultLauncher.
-                    isAdminActive = devicePolicyManager.isAdminActive(componentName)
+                // The button's only job is now to ask for permission.
+                val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                    putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, componentName)
+                    putExtra(
+                        DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                        "This permission is required to allow the app to lock the screen."
+                    )
                 }
+                context.startActivity(intent)
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(text = if (isAdminActive) "Lock Screen Now" else "Activate Permission")
+            Text(text = "Activate Permission")
         }
     }
 }
+
