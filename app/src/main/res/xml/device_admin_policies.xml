@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This XML file defines the security policies our app wants to enforce.
+  For this app, we only need one policy: 'force-lock'.
+  This grants the app permission to lock the screen.
+-->
+<device-admin>
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>
